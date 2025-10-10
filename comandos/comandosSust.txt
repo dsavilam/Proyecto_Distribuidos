@@ -46,41 +46,51 @@ python -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
 
 # Reemplaza las IPs entre <> por las reales de tus VMs:
 
-# <IP_GA>  = IP de VM1
+(VM SANTIAGO): 10.43.102.163
 
-# <IP_GC>  = IP de VM2
+(VM ANDRES): 10.43.103.42
+
+(VM DANIEL) 10.43.101.229
+
+# <IP_GA>  = 10.43.101.229 DANIEL
+
+# <IP_GC>  = 10.43.103.42 ANDRES
+
+# <IP_ACTOR_DEV> = 10.43.102.163 SANTIAGO
+
+# <IP_ACTOR_REN> = 10.43.102.154 AMELIE
 
 # Orden recomendado: GA → Actores → GC → PS
 
-# VM1 — GA
+# VM1 — GA DANIEL
 
-python -m ga.ga --rep tcp://0.0.0.0:5570 --db ga/biblioteca.db
+python3 -m ga.ga --rep tcp://0.0.0.0:5570 --db ga/biblioteca.db
 
-# VM3 — Actor DEVOL
+# VM3 — Actor DEVOL SANTIAGO
 
-python -m actores.actor_devol --sub tcp://<IP_GC>:5560 --ga tcp://<IP_GA>:5570 --hc tcp://0.0.0.0:5601
+python3 -m actores.actor_devol --sub tcp://10.43.103.42:5560 --ga tcp://10.43.101.229:5570 --hc tcp://0.0.0.0:5601
 
-# VM4 — Actor RENOV
+# VM4 — Actor RENOV AMELIE
 
-python -m actores.actor_renov --sub tcp://<IP_GC>:5560 --ga tcp://<IP_GA>:5570 --hc tcp://0.0.0.0:5602
+python3 -m actores.actor_renov --sub tcp://10.43.103.42:5560 --ga tcp://10.43.101.229:5570 --hc tcp://0.0.0.0:5602
 
-# VM2 — GC
+# VM2 — GC ANDRES
 
-python -m gestor_carga.gc --rep tcp://0.0.0.0:5555 --pub tcp://0.0.0.0:5560 --hc-dev tcp://<IP_ACTOR_DEV>:5601 --hc-ren tcp://<IP_ACTOR_REN>:5602
+python3 -m gestor_carga.gc --rep tcp://0.0.0.0:5555 --pub tcp://0.0.0.0:5560 --hc-dev tcp://10.43.102.163:5601 --hc-ren tcp://10.43.102.154:5602
 
-# VM2 — PS Sede 1
+# VM2 — PS Sede 1 ANDRES
 
-python -m ps.ps --file ps/data/sol_sede1.txt --endpoint tcp://127.0.0.1:5555
+python3 -m ps.ps --file ps/data/sol_sede1.txt --endpoint tcp://127.0.0.1:5555
 
-# VM2 — PS Sede 2
+# VM2 — PS Sede 2 ANDRES
 
-python -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
+python3 -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
 
 # Notas:
 
 # - Si queremos correr los PS desde otra máquina, cambiamos el endpoint a:
 
-# --endpoint tcp://<IP_GC>:5555
+# --endpoint tcp://10.43.103.42:5555
 
 # Abrir puertos en firewall de las VMs: 5555 (GC-REP), 5560 (GC-PUB) y 5570 (GA-REP).
 
@@ -90,3 +100,4 @@ SI EL VENV JODE EN WINDOWS:
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
 
 ..venv\Scripts\Activate.ps1
+
