@@ -10,20 +10,21 @@ cd ..
 # TERMINAL 1 — GA
 python -m ga.ga --rep tcp://*:5570 --db ga/biblioteca.db
 
-# TERMINAL 2 — ACTOR DEVOLUCIÓN
+# TERMINAL 2 — Actor DEVOL
 python -m actores.actor_devol --sub tcp://127.0.0.1:5560 --ga tcp://127.0.0.1:5570
 
-# TERMINAL 3 — ACTOR RENOVACIÓN
+# TERMINAL 3 — Actor RENOV
 python -m actores.actor_renov --sub tcp://127.0.0.1:5560 --ga tcp://127.0.0.1:5570
 
-# TERMINAL 4 — GC
-python -m gc.gc --rep tcp://*:5555 --pub tcp://*:5560
+# TERMINAL 4 — Gestor de Carga (GC) 
+python -m gestor_carga.gc --rep tcp://*:5555 --pub tcp://*:5560
 
-# TERMINAL 5 — PS (SEDE 1)
+# TERMINAL 5 — PS Sede 1
 python -m ps.ps --file ps/data/sol_sede1.txt --endpoint tcp://127.0.0.1:5555
 
-# TERMINAL 6 — PS (SEDE 2)
+# TERMINAL 6 — PS Sede 2
 python -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
+
 
 # 4 VMs (4 máquinas en total)
 
@@ -45,36 +46,24 @@ python -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
 
 # Orden recomendado: GA → Actores → GC → PS
 
-# VM1 — GESTOR ALMACENAMIENTO (GA)
+# VM1 — GA
+python -m ga.ga --rep tcp://0.0.0.0:5570 --db ga/biblioteca.db
 
-# (Solo la primera vez en VM1, crear BD si aún no existe)
+# VM3 — Actor DEVOL
+python -m actores.actor_devol --sub tcp://<IP_GC>:5560 --ga tcp://<IP_GA>:5570
 
-cd ga
-python init_db.py
+# VM4 — Actor RENOV
+python -m actores.actor_renov --sub tcp://<IP_GC>:5560 --ga tcp://<IP_GA>:5570
 
-# Levantar GA (escucha en todas las interfaces)
+# VM2 — GC  
+python -m gestor_carga.gc --rep tcp://0.0.0.0:5555 --pub tcp://0.0.0.0:5560
 
-python ga.py --rep tcp://0.0.0.0:5570 --db biblioteca.db
+# VM2 — PS Sede 1
+python -m ps.ps --file ps/data/sol_sede1.txt --endpoint tcp://127.0.0.1:5555
 
-# VM3 — ACTOR DEVOLUCIÓN (se conecta a GC y GA por IP)
+# VM2 — PS Sede 2
+python -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
 
-python actores/actor_devol.py --sub tcp://<IP_GC>:5560 --ga tcp://<IP_GA>:5570
-
-# VM4 — ACTOR RENOVACIÓN (se conecta a GC y GA por IP)
-
-python actores/actor_renov.py --sub tcp://<IP_GC>:5560 --ga tcp://<IP_GA>:5570
-
-# VM2 — GESTOR DE CARGA (GC)
-
-python gc/gc.py --rep tcp://0.0.0.0:5555 --pub tcp://0.0.0.0:5560
-
-# VM2 — PS (SEDE 1) apuntando al GC (misma VM)
-
-python ps/ps.py --file ps/data/sol_sede1.txt --endpoint tcp://127.0.0.1:5555
-
-# VM2 — PS (SEDE 2) apuntando al GC (misma VM)
-
-python ps/ps.py --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
 
 # Notas:
 

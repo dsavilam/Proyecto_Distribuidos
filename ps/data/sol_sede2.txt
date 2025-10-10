@@ -1,0 +1,10 @@
+{"op":"RENOVACION","idSolicitud":"S-011","idUsuario":"U011","idLibro":"L110","sede":"SEDE2","timestamp":"2025-10-07T21:01:00Z"}
+{"op":"DEVOLUCION","idSolicitud":"S-012","idUsuario":"U012","idLibro":"L111","sede":"SEDE2","timestamp":"2025-10-07T21:01:05Z"}
+{"op":"DEVOLUCION","idSolicitud":"S-013","idUsuario":"U013","idLibro":"L112","sede":"SEDE2","timestamp":"2025-10-07T21:01:10Z"}
+{"op":"RENOVACION","idSolicitud":"S-014","idUsuario":"U014","idLibro":"L113","sede":"SEDE2","timestamp":"2025-10-07T21:01:15Z"}
+{"op":"DEVOLUCION","idSolicitud":"S-015","idUsuario":"U015","idLibro":"L114","sede":"SEDE2","timestamp":"2025-10-07T21:01:20Z"}
+{"op":"RENOVACION","idSolicitud":"S-016","idUsuario":"U016","idLibro":"L115","sede":"SEDE2","timestamp":"2025-10-07T21:01:25Z"}
+{"op":"RENOVACION","idSolicitud":"S-017","idUsuario":"U017","idLibro":"L116","sede":"SEDE2","timestamp":"2025-10-07T21:01:30Z"}
+{"op":"DEVOLUCION","idSolicitud":"S-018","idUsuario":"U018","idLibro":"L117","sede":"SEDE2","timestamp":"2025-10-07T21:01:35Z"}
+{"op":"RENOVACION","idSolicitud":"S-019","idUsuario":"U019","idLibro":"L118","sede":"SEDE2","timestamp":"2025-10-07T21:01:40Z"}
+{"op":"DEVOLUCION","idSolicitud":"S-020","idUsuario":"U020","idLibro":"L119","sede":"SEDE2","timestamp":"2025-10-07T21:01:45Z"}

@@ -24,7 +24,7 @@ def main():
 
             if op not in (TOPIC_DEVOL, TOPIC_RENOV):
                 rep.send_string(json.dumps({"ok": False, "msg": "op no soportada (Ent1)"}))
-                print(f"[GC] ⚠ op desconocida: {op} payload={msg}")
+                print(f"[GC] op desconocida: {op} payload={msg}")
                 continue
 
             print(f"[GC] Recibí {op}: {msg}")
