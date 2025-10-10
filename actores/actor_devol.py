@@ -1,48 +1,61 @@
-import zmq, json, argparse, time
-from common.config import GC_PUB_CONNECT, GA_REP_CONNECT, TOPIC_DEVOL
+import argparse, json, time, threading, zmq
+
+def servir_health(ctx: zmq.Context, bind_addr: str, nombre: str):
+    """REP de health: responde a {'type':'health'} con {'type':'health_ok'}."""
+    rep = ctx.socket(zmq.REP); rep.bind(bind_addr)
+    print(f"[{nombre}] Health REP en {bind_addr}")
+    try:
+        while True:
+            try:
+                req = rep.recv_json()
+                if req.get("type") == "health":
+                    rep.send_json({"type": "health_ok", "actor": nombre})
+                else:
+                    rep.send_json({"type": "error", "error": "unknown"})
+            except zmq.ContextTerminated:
+                break
+            except Exception as e:
+                try: rep.send_json({"type":"error","error":str(e)})
+                except: pass
+    finally:
+        rep.close(0)
 
 def main():
     ap = argparse.ArgumentParser(description="Actor DEVOLUCION")
-    ap.add_argument("--sub", default=GC_PUB_CONNECT, help="Endpoint SUB (GC PUB connect)")
-    ap.add_argument("--ga",  default=GA_REP_CONNECT,  help="Endpoint REQ a GA")
+    ap.add_argument("--sub", required=True, help="Dirección del PUB del GC (p.ej. tcp://127.0.0.1:5560)")
+    ap.add_argument("--ga",  required=True, help="Dirección REP del GA (p.ej. tcp://127.0.0.1:5570)")
+    ap.add_argument("--hc",  default="tcp://*:5601", help="Bind REP health del actor (default tcp://*:5601)")
+    ap.add_argument("--name", default="ACTOR-DEV", help="Nombre del actor para logs")
     args = ap.parse_args()
 
     ctx = zmq.Context.instance()
+
+    # Health REP en un thread aparte
+    threading.Thread(target=servir_health, args=(ctx, args.hc, args.name), daemon=True).start()
+
+    # SUB al GC
     sub = ctx.socket(zmq.SUB); sub.connect(args.sub)
-    sub.setsockopt_string(zmq.SUBSCRIBE, TOPIC_DEVOL)
+    sub.setsockopt_string(zmq.SUBSCRIBE, "DEVOLUCION")
+    print(f"[{args.name}] SUB a {args.sub} (tópico DEVOLUCION)")
 
+    # REQ al GA
     req = ctx.socket(zmq.REQ); req.connect(args.ga)
-    req.setsockopt(zmq.RCVTIMEO, 4000)
-
-    print(f"[ACTOR-DEV] SUB a {args.sub} (tópico {TOPIC_DEVOL})")
-    print(f"[ACTOR-DEV] REQ a GA {args.ga}")
+    req.setsockopt(zmq.RCVTIMEO, 5000)
+    print(f"[{args.name}] REQ->GA {args.ga}")
 
     try:
         while True:
             topic, payload = sub.recv_multipart()
             data = json.loads(payload.decode("utf-8"))
-            print(f"[ACTOR-DEV] {topic.decode()}: {data}")
+            print(f"[{args.name}] Recibí {topic.decode()}: {data}")
 
-            # Armar request a GA
-            ga_msg = {
-                "op": "DEVOLUCION",
-                "idempotencyKey": data.get("idempotencyKey"),
-                "idSolicitud":    data.get("idSolicitud"),
-                "idUsuario":      data.get("idUsuario"),
-                "idLibro":        data.get("idLibro"),
-                "sede":           data.get("sede"),
-                "timestamp":      data.get("timestamp"),
-            }
-
-            req.send_string(json.dumps(ga_msg))
-            try:
-                resp = req.recv_string()
-                print(f"[ACTOR-DEV] GA → {resp}")
-            except zmq.Again:
-                print("[ACTOR-DEV] ⚠ Timeout esperando GA")
+            # Enviar a GA para aplicar devolución
+            req.send_json({"type": "DEVOLUCION", "payload": data})
+            resp = req.recv_json()
+            print(f"[{args.name}] GA→ {resp}")
             time.sleep(0.01)
     except KeyboardInterrupt:
-        print("\n[ACTOR-DEV] Saliendo...")
+        print(f"\n[{args.name}] Saliendo...")
     finally:
         sub.close(0); req.close(0); ctx.term()
 

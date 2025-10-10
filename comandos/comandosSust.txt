@@ -3,28 +3,34 @@
 # Orden GA → Actores → GC → PS
 
 # (solo 1ª vez, crear BD)
+
 cd ga
 python init_db.py
 cd ..
 
 # TERMINAL 1 — GA
+
 python -m ga.ga --rep tcp://*:5570 --db ga/biblioteca.db
 
 # TERMINAL 2 — Actor DEVOL
-python -m actores.actor_devol --sub tcp://127.0.0.1:5560 --ga tcp://127.0.0.1:5570
+
+python -m actores.actor_devol --sub tcp://127.0.0.1:5560 --ga tcp://127.0.0.1:5570 --hc tcp://*:5601
 
 # TERMINAL 3 — Actor RENOV
-python -m actores.actor_renov --sub tcp://127.0.0.1:5560 --ga tcp://127.0.0.1:5570
 
-# TERMINAL 4 — Gestor de Carga (GC) 
-python -m gestor_carga.gc --rep tcp://*:5555 --pub tcp://*:5560
+python -m actores.actor_renov --sub tcp://127.0.0.1:5560 --ga tcp://127.0.0.1:5570 --hc tcp://*:5602
+
+# TERMINAL 4 — Gestor de Carga (GC)
+
+python -m gestor_carga.gc --rep tcp://*:5555 --pub tcp://*:5560 --hc-dev tcp://127.0.0.1:5601 --hc-ren tcp://127.0.0.1:5602
 
 # TERMINAL 5 — PS Sede 1
+
 python -m ps.ps --file ps/data/sol_sede1.txt --endpoint tcp://127.0.0.1:5555
 
 # TERMINAL 6 — PS Sede 2
-python -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
 
+python -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
 
 # 4 VMs (4 máquinas en total)
 
@@ -47,23 +53,28 @@ python -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
 # Orden recomendado: GA → Actores → GC → PS
 
 # VM1 — GA
+
 python -m ga.ga --rep tcp://0.0.0.0:5570 --db ga/biblioteca.db
 
 # VM3 — Actor DEVOL
-python -m actores.actor_devol --sub tcp://<IP_GC>:5560 --ga tcp://<IP_GA>:5570
+
+python -m actores.actor_devol --sub tcp://<IP_GC>:5560 --ga tcp://<IP_GA>:5570 --hc tcp://0.0.0.0:5601
 
 # VM4 — Actor RENOV
-python -m actores.actor_renov --sub tcp://<IP_GC>:5560 --ga tcp://<IP_GA>:5570
 
-# VM2 — GC  
-python -m gestor_carga.gc --rep tcp://0.0.0.0:5555 --pub tcp://0.0.0.0:5560
+python -m actores.actor_renov --sub tcp://<IP_GC>:5560 --ga tcp://<IP_GA>:5570 --hc tcp://0.0.0.0:5602
+
+# VM2 — GC
+
+python -m gestor_carga.gc --rep tcp://0.0.0.0:5555 --pub tcp://0.0.0.0:5560 --hc-dev tcp://<IP_ACTOR_DEV>:5601 --hc-ren tcp://<IP_ACTOR_REN>:5602
 
 # VM2 — PS Sede 1
+
 python -m ps.ps --file ps/data/sol_sede1.txt --endpoint tcp://127.0.0.1:5555
 
 # VM2 — PS Sede 2
-python -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
 
+python -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
 
 # Notas:
 
@@ -78,4 +89,4 @@ python -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
 SI EL VENV JODE EN WINDOWS:
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
 
-.\.venv\Scripts\Activate.ps1
+..venv\Scripts\Activate.ps1
