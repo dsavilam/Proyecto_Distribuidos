@@ -86,7 +86,7 @@ def main():
 
     print(f"[GA] REP en {args.rep}")
     print(f"[GA] Usando BD: {args.db}")
-    print("[GA] Esperando operaciones... (Ctrl+C para salir)")
+    print("[GA] Esperando operaciones...")
 
     try:
         while True:

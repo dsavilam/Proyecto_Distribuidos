@@ -39,7 +39,7 @@ def main():
     print(f"[{args.name}] SUB a {args.sub} (tópico RENOVACION)")
 
     # REQ al GA
-    req = ctx.socket(zmq.Req);  # o zmq.REQ
+    req = ctx.socket(zmq.REQ); 
     req = ctx.socket(zmq.REQ); req.connect(args.ga)
     req.setsockopt(zmq.RCVTIMEO, 5000)
     print(f"[{args.name}] REQ->GA {args.ga}")
