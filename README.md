@@ -1,2 +1,2 @@
 # Proyecto_Distribuidos
-I want to kms
+Proyecto 1 SisDistri!
