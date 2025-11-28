@@ -55,13 +55,13 @@ def llamar_ga_con_failover(
         try:
             sock.send_json(data)
             resp = sock.recv_json()
-            print(f"[ACTOR-DEV] GA {ep} → {resp}")
+            print(f"[ACTOR-PREST] GA {ep} → {resp}")
             sock.close(0)
             return resp
         except zmq.Again:
-            print(f"[ACTOR-DEV][WARN] Timeout hablando con GA {ep}, probando siguiente si existe...")
+            print(f"[ACTOR-PREST][WARN] Timeout hablando con GA {ep}, probando siguiente si existe...")
         except Exception as e:
-            print(f"[ACTOR-DEV][ERROR] Falla hablando con GA {ep}: {e}")
+            print(f"[ACTOR-PREST][ERROR] Falla hablando con GA {ep}: {e}")
         finally:
             try:
                 sock.close(0)
@@ -72,23 +72,16 @@ def llamar_ga_con_failover(
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Actor DEVOLUCION (SUB + REQ->GA + Health)")
+    ap = argparse.ArgumentParser(description="Actor PRESTAMO (REP←GC, REQ→GA, Health)")
     ap.add_argument(
-        "--sub",
-        required=True,
-        help="Dirección del PUB del GC (p.ej. tcp://127.0.0.1:5560)",
-    )
-    # Compatibilidad hacia atrás: --ga (un solo endpoint) o --ga-primary/--ga-backup
-    ap.add_argument(
-        "--ga",
-        dest="ga",
-        default=None,
-        help="Endpoint único del GA (legacy, se asume primario)",
+        "--bind",
+        default="tcp://*:5585",
+        help="Bind REP para que el GC se conecte (default tcp://*:5585)",
     )
     ap.add_argument(
         "--ga-primary",
         dest="ga_primary",
-        default=None,
+        required=True,
         help="Dirección REP del GA primario (p.ej. tcp://127.0.0.1:5570)",
     )
     ap.add_argument(
@@ -99,53 +92,48 @@ def main():
     )
     ap.add_argument(
         "--hc",
-        default="tcp://*:5601",
-        help="Bind REP health del actor (default tcp://*:5601)",
+        default="tcp://*:5603",
+        help="Bind REP health del actor (default tcp://*:5603)",
     )
     ap.add_argument(
         "--name",
-        default="ACTOR-DEV",
+        default="ACTOR-PREST",
         help="Nombre del actor para logs",
     )
     args = ap.parse_args()
 
-    ga_primary = args.ga_primary or args.ga
-    ga_backup = args.ga_backup
-
-    if not ga_primary:
-        raise SystemExit("Debe especificar --ga-primary o --ga (endpoint del GA).")
-
     ctx = zmq.Context.instance()
 
-    # Health REP en un thread aparte
+    # Health REP en hilo aparte
     threading.Thread(
         target=servir_health,
         args=(ctx, args.hc, args.name),
         daemon=True,
     ).start()
 
-    # SUB al GC
-    sub = ctx.socket(zmq.SUB)
-    sub.connect(args.sub)
-    sub.setsockopt_string(zmq.SUBSCRIBE, "DEVOLUCION")
-    print(f"[{args.name}] SUB a {args.sub} (tópico DEVOLUCION)")
-
-    print(f"[{args.name}] GA primario: {ga_primary} | GA backup: {ga_backup or '-'}")
+    # REP para PRESTAMO (desde GC)
+    rep = ctx.socket(zmq.REP)
+    rep.bind(args.bind)
+    print(f"[{args.name}] REP PRESTAMO en {args.bind}")
+    print(f"[{args.name}] GA primario: {args.ga_primary} | GA backup: {args.ga_backup or '-'}")
 
     try:
         while True:
-            topic, payload = sub.recv_multipart()
-            data = json.loads(payload.decode("utf-8"))
-            print(f"[{args.name}] Recibí {topic.decode()}: {data}")
+            data = rep.recv_json()
+            op = (data.get("op") or "").upper()
+            print(f"[{args.name}] Recibí solicitud de GC: {op} id={data.get('idSolicitud')} data={data}")
 
-            # Enviar a GA para aplicar devolución con failover
-            resp = llamar_ga_con_failover(ctx, data, ga_primary, ga_backup)
-            print(f"[{args.name}] Respuesta GA → {resp}")
+            if op != "PRESTAMO":
+                resp = {"ok": False, "msg": f"op no soportada por actor PRESTAMO: {op}"}
+            else:
+                resp = llamar_ga_con_failover(ctx, data, args.ga_primary, args.ga_backup)
+
+            rep.send_json(resp)
             time.sleep(0.01)
     except KeyboardInterrupt:
         print(f"\n[{args.name}] Saliendo...")
     finally:
-        sub.close(0)
+        rep.close(0)
         ctx.term()
 
 

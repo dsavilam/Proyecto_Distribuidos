@@ -1,103 +1,277 @@
-# LOCALHOST (6 terminales)
+# ============================================================
+# LOCALHOST – ENTREGA 2 (8 terminales)
+# GA primario + GA backup + Actores + GC + PS
+# ============================================================
 
-# Orden GA → Actores → GC → PS
-
-# (solo 1ª vez, crear BD)
+# (solo 1ª vez, crear / resetear BD primaria y réplica)
 
 cd ga
-python init_db.py
+python init_db.py --db biblioteca.db
+python init_db.py --db biblioteca_replica.db
 cd ..
 
-# TERMINAL 1 — GA
+# ------------------------------------------------------------
+# TERMINAL 1 — GA PRIMARIO
+# ------------------------------------------------------------
 
-python -m ga.ga --rep tcp://*:5570 --db ga/biblioteca.db
+python -m ga.ga --role primary --rep tcp://*:5570 --db ga/biblioteca.db --db-replica ga/biblioteca_replica.db
 
-# TERMINAL 2 — Actor DEVOL
+# ------------------------------------------------------------
+# TERMINAL 2 — GA BACKUP
+# ------------------------------------------------------------
 
-python -m actores.actor_devol --sub tcp://127.0.0.1:5560 --ga tcp://127.0.0.1:5570 --hc tcp://*:5601
+python -m ga.ga --role backup --rep tcp://*:5571 --db ga/biblioteca_replica.db
 
-# TERMINAL 3 — Actor RENOV
+# ------------------------------------------------------------
+# TERMINAL 3 — Actor DEVOL (failover GA primario/backup)
+# ------------------------------------------------------------
 
-python -m actores.actor_renov --sub tcp://127.0.0.1:5560 --ga tcp://127.0.0.1:5570 --hc tcp://*:5602
+python -m actores.actor_devol --sub tcp://127.0.0.1:5560 --ga-primary tcp://127.0.0.1:5570 --ga-backup tcp://127.0.0.1:5571 --hc tcp://*:5601
 
-# TERMINAL 4 — Gestor de Carga (GC)
+# ------------------------------------------------------------
+# TERMINAL 4 — Actor RENOV (failover GA primario/backup)
+# ------------------------------------------------------------
 
-python -m gestor_carga.gc --rep tcp://*:5555 --pub tcp://*:5560 --hc-dev tcp://127.0.0.1:5601 --hc-ren tcp://127.0.0.1:5602
+python -m actores.actor_renov --sub tcp://127.0.0.1:5560 --ga-primary tcp://127.0.0.1:5570 --ga-backup tcp://127.0.0.1:5571 --hc tcp://*:5602
 
-# TERMINAL 5 — PS Sede 1
+# ------------------------------------------------------------
+# TERMINAL 5 — Actor PRESTAMO (síncrono, failover GA)
+# ------------------------------------------------------------
 
-python -m ps.ps --file ps/data/sol_sede1.txt --endpoint tcp://127.0.0.1:5555
+python -m actores.actor_prestamo --bind tcp://*:5585 --ga-primary tcp://127.0.0.1:5570 --ga-backup tcp://127.0.0.1:5571 --hc tcp://*:5603
 
-# TERMINAL 6 — PS Sede 2
+# ------------------------------------------------------------
+# TERMINAL 6 — Gestor de Carga (GC)
+# ------------------------------------------------------------
 
-python -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
+python -m gestor_carga.gc --rep tcp://*:5555 --pub tcp://*:5560 --hc-dev tcp://127.0.0.1:5601 --hc-ren tcp://127.0.0.1:5602 --prestamo-addr tcp://127.0.0.1:5585
 
+# ------------------------------------------------------------
+# TERMINAL 7 — PS Sede 1 (DEVOL/RENOV)
+# ------------------------------------------------------------
+
+python -m ps.ps --file ps/data/sol_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS1
+
+# ------------------------------------------------------------
+# TERMINAL 8 — PS Sede 2 (DEVOL/RENOV)
+# ------------------------------------------------------------
+
+python -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS1
+
+
+# ============================================================
+# LOCALHOST – EXPERIMENTOS PRESTAMO (usar archivos sol_prest_*)
+# ============================================================
+# Asumimos:
+#   ps/data/sol_prest_sede1.txt  (≈30 PRESTAMO SEDE1)
+#   ps/data/sol_prest_sede2.txt  (≈30 PRESTAMO SEDE2)
+# Con TERMINALES 1–6 ya levantadas.
+
+# ------------------------------------------------------------
+# Escenario A – 4 PS por sede
+# ------------------------------------------------------------
+
+# SEDE1 (4 procesos PS en paralelo)
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS1
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS2
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS3
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS4
+
+# SEDE2 (4 procesos PS en paralelo)
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS1
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS2
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS3
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS4
+
+# ------------------------------------------------------------
+# Escenario B – 6 PS por sede
+# ------------------------------------------------------------
+
+# SEDE1
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS1
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS2
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS3
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS4
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS5
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS6
+
+# SEDE2
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS1
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS2
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS3
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS4
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS5
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS6
+
+# ------------------------------------------------------------
+# Escenario C – 10 PS por sede
+# ------------------------------------------------------------
+
+# SEDE1
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS1
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS2
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS3
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS4
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS5
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS6
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS7
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS8
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS9
+python -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS10
+
+# SEDE2
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS1
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS2
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS3
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS4
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS5
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS6
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS7
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS8
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS9
+python -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS10
+
+
+# ============================================================
 # 4 VMs (4 máquinas en total)
+# ============================================================
 
 # Asignación de roles:
 
-# VM1 = GA        (Gestor de Almacenamiento)
+# VM1 (DANIEL)   = GA primario + GA backup
+# VM2 (ANDRES)   = GC + PS + ACTOR-PREST
+# VM3 (SANTIAGO) = Actor DEV (Devolución)
+# VM4 (AMELIE)   = Actor REN (Renovación)
 
-# VM2 = GC + PS   (Gestor de Carga + ambos PS)
+# IPs:
 
-# VM3 = Actor DEV (Actor de Devolución)
+# VM1 (DANIEL)   10.43.101.229
+# VM2 (ANDRES)   10.43.103.42
+# VM3 (SANTIAGO) 10.43.102.163
+# VM4 (AMELIE)   10.43.102.154
 
-# VM4 = Actor REN (Actor de Renovación)
+# Reemplaza si cambian las IPs.
 
-# Reemplaza las IPs entre <> por las reales de tus VMs:
 
-(VM SANTIAGO): 10.43.102.163
+# ------------------------------------------------------------
+# VM1 — DANIEL – GA primario + GA backup
+# ------------------------------------------------------------
 
-(VM ANDRES): 10.43.103.42
+cd PROYECTO_DISTRIBUIDOS
+python3 ga/init_db.py --db ga/biblioteca.db
+python3 ga/init_db.py --db ga/biblioteca_replica.db
 
-(VM DANIEL) 10.43.101.229
+python3 -m ga.ga --role primary --rep tcp://0.0.0.0:5570 --db ga/biblioteca.db --db-replica ga/biblioteca_replica.db
 
-# <IP_GA>  = 10.43.101.229 DANIEL
+python3 -m ga.ga --role backup --rep tcp://0.0.0.0:5571 --db ga/biblioteca_replica.db
 
-# <IP_GC>  = 10.43.103.42 ANDRES
 
-# <IP_ACTOR_DEV> = 10.43.102.163 SANTIAGO
+# ------------------------------------------------------------
+# VM3 — SANTIAGO – Actor DEVOL
+# ------------------------------------------------------------
 
-# <IP_ACTOR_REN> = 10.43.102.154 AMELIE
+cd PROYECTO_DISTRIBUIDOS
+python3 -m actores.actor_devol --sub tcp://10.43.103.42:5560 --ga-primary tcp://10.43.101.229:5570 --ga-backup tcp://10.43.101.229:5571 --hc tcp://0.0.0.0:5601
 
-# Orden recomendado: GA → Actores → GC → PS
 
-# VM1 — GA DANIEL
+# ------------------------------------------------------------
+# VM4 — AMELIE – Actor RENOV
+# ------------------------------------------------------------
 
-python3 -m ga.ga --rep tcp://0.0.0.0:5570 --db ga/biblioteca.db
+cd PROYECTO_DISTRIBUIDOS
+python3 -m actores.actor_renov --sub tcp://10.43.103.42:5560 --ga-primary tcp://10.43.101.229:5570 --ga-backup tcp://10.43.101.229:5571 --hc tcp://0.0.0.0:5602
 
-# VM3 — Actor DEVOL SANTIAGO
 
-python3 -m actores.actor_devol --sub tcp://10.43.103.42:5560 --ga tcp://10.43.101.229:5570 --hc tcp://0.0.0.0:5601
+# ------------------------------------------------------------
+# VM2 — ANDRES – ACTOR-PREST + GC + PS
+# ------------------------------------------------------------
 
-# VM4 — Actor RENOV AMELIE
+cd PROYECTO_DISTRIBUIDOS
 
-python3 -m actores.actor_renov --sub tcp://10.43.103.42:5560 --ga tcp://10.43.101.229:5570 --hc tcp://0.0.0.0:5602
+# Actor PRESTAMO (misma VM que GC)
+python3 -m actores.actor_prestamo --bind tcp://0.0.0.0:5585 --ga-primary tcp://10.43.101.229:5570 --ga-backup tcp://10.43.101.229:5571 --hc tcp://0.0.0.0:5603
 
-# VM2 — GC ANDRES
+# Gestor de Carga (GC)
+python3 -m gestor_carga.gc --rep tcp://0.0.0.0:5555 --pub tcp://0.0.0.0:5560 --hc-dev tcp://10.43.102.163:5601 --hc-ren tcp://10.43.102.154:5602 --prestamo-addr tcp://127.0.0.1:5585
 
-python3 -m gestor_carga.gc --rep tcp://0.0.0.0:5555 --pub tcp://0.0.0.0:5560 --hc-dev tcp://10.43.102.163:5601 --hc-ren tcp://10.43.102.154:5602
+# PS Sede 1 (DEVOL/RENOV)
+python3 -m ps.ps --file ps/data/sol_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS1
 
-# VM2 — PS Sede 1 ANDRES
+# PS Sede 2 (DEVOL/RENOV)
+python3 -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS1
 
-python3 -m ps.ps --file ps/data/sol_sede1.txt --endpoint tcp://127.0.0.1:5555
 
-# VM2 — PS Sede 2 ANDRES
+# ------------------------------------------------------------
+# VM2 — ANDRES – Experimentos PRESTAMO en 4 VMs
+# (igual que en localhost pero usando python3)
+# ------------------------------------------------------------
 
-python3 -m ps.ps --file ps/data/sol_sede2.txt --endpoint tcp://127.0.0.1:5555
+# Escenario A – 4 PS por sede
 
-# Notas:
+# SEDE1
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS1
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS2
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS3
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS4
 
-# - Si queremos correr los PS desde otra máquina, cambiamos el endpoint a:
+# SEDE2
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS1
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS2
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS3
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS4
 
-# --endpoint tcp://10.43.103.42:5555
+# Escenario B – 6 PS por sede
 
-# Abrir puertos en firewall de las VMs: 5555 (GC-REP), 5560 (GC-PUB) y 5570 (GA-REP).
+# SEDE1
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS1
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS2
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS3
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS4
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS5
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS6
 
-# RECORDAR: GA → Actores → GC → PS.
+# SEDE2
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS1
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS2
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS3
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS4
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS5
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS6
 
-SI EL VENV JODE EN WINDOWS:
-Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
+# Escenario C – 10 PS por sede
 
-..venv\Scripts\Activate.ps1
+# SEDE1
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS1
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS2
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS3
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS4
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS5
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS6
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS7
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS8
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS9
+python3 -m ps.ps --file ps/data/sol_prest_sede1.txt --endpoint tcp://127.0.0.1:5555 --label SEDE1-PS10
 
+# SEDE2
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS1
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS2
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS3
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS4
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS5
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS6
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS7
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS8
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS9
+python3 -m ps.ps --file ps/data/sol_prest_sede2.txt --endpoint tcp://127.0.0.1:5555 --label SEDE2-PS10
+
+
+# ------------------------------------------------------------
+# NOTAS FINALES
+# ------------------------------------------------------------
+
+# - Abrir puertos en las VMs: 5555 (GC-REP), 5560 (GC-PUB), 5570–5571 (GA-REP),
+#   5585 (Actor PREST), 5601–5603 (health checks).
+# - Orden recomendado de arranque: GA primario → GA backup → Actores → GC → PS.
+# - En Windows, si el venv da problemas:
+#       Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
+#       .venv\Scripts\Activate.ps1
